@@ -1,7 +1,6 @@
 import BookmarksKit
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 
 /// The share extension's principal class has to be a `UIViewController`; everything it shows is
 /// SwiftUI.
@@ -21,13 +20,19 @@ final class ShareViewController: UIViewController {
         host.didMove(toParent: self)
     }
 
+    /// The completion-handler API, because only `URL` — which is `Sendable` — crosses back. The async
+    /// `loadItem` returns `any NSSecureCoding`, whose sendability differs between SDK releases.
     private func sharedURL() async -> URL? {
         let providers = (extensionContext?.inputItems as? [NSExtensionItem] ?? [])
             .flatMap { $0.attachments ?? [] }
-            .filter { $0.hasItemConformingToTypeIdentifier(UTType.url.identifier) }
+            .filter { $0.canLoadObject(ofClass: URL.self) }
         guard let provider = providers.first else { return nil }
 
-        return try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL
+        return await withCheckedContinuation { continuation in
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                continuation.resume(returning: url)
+            }
+        }
     }
 }
 

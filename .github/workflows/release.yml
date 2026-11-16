@@ -16,4 +16,6 @@ jobs:
     uses: amine2233/ci-shared/.github/workflows/semantic-release.yml@1.1.1
     with:
       release-args: "--write-change-log"
+      # executor links libxml2.so.2, which Ubuntu 26 (the new ubuntu-latest) no longer ships.
+      runner: ubuntu-24.04
     secrets: inherit

@@ -59,3 +59,33 @@ struct MigrationTests {
         try await database.repository(for: NoteEntity.self).upsert(Note(title: "From V2"))
     }
 }
+
+@Suite("Incompatible store detection")
+struct IncompatibleStoreDetectionTests {
+    @Test func aStoreFromAKnownVersionIsCompatible() async throws {
+        let directory = try TemporaryDirectory()
+        try await DatabaseDefault(configuration: .notes(at: directory.storeURL()), logger: DatabaseLoggerMock())
+            .repository(for: NoteEntity.self)
+            .upsert(Note(title: "Known"))
+
+        #expect(!ModelContainerFactory.storeMatchesNoKnownVersion(at: directory.storeURL(), schema: NoteSchema.self))
+    }
+
+    @Test func aStoreFromAnUnknownVersionIsIncompatible() async throws {
+        let directory = try TemporaryDirectory()
+        try await DatabaseDefault(configuration: .notes(at: directory.storeURL()), logger: DatabaseLoggerMock())
+            .repository(for: NoteEntity.self)
+            .upsert(Note(title: "Unknown to the old plan"))
+
+        #expect(ModelContainerFactory.storeMatchesNoKnownVersion(
+            at: directory.storeURL(),
+            schema: NoteSchemaIncompatible.self
+        ))
+    }
+
+    @Test func aMissingOrUnreadableFileIsNeverIncompatible() throws {
+        let directory = try TemporaryDirectory()
+
+        #expect(!ModelContainerFactory.storeMatchesNoKnownVersion(at: directory.storeURL(), schema: NoteSchema.self))
+    }
+}

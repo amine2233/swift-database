@@ -14,7 +14,7 @@ run = "executor format ."
 
 [tasks.test]
 description = "Run package tests on macOS (SwiftData is Apple-only: there is no Linux run)."
-run = "swift test"
+run = "Scripts/ci-annotate.sh swift test"
 
 [tasks.test-coverage]
 description = "Run tests with executor-generated coverage report (requires xcrun; macOS only)."
@@ -41,7 +41,7 @@ if [[ -z "$device_id" ]]; then
     echo "No available iPhone simulator" >&2
     exit 1
 fi
-xcodebuild test \
+Scripts/ci-annotate.sh xcodebuild test \
     -scheme DatabaseKit-Package \
     -destination "id=$device_id" \
     -derivedDataPath .build/xcode \
@@ -55,7 +55,7 @@ run = '''
 set -euo pipefail
 for platform in "iOS Simulator" "tvOS Simulator" "watchOS Simulator" "visionOS Simulator" "macOS"; do
     echo "▸ Building DatabaseKit for $platform"
-    xcodebuild build \
+    Scripts/ci-annotate.sh xcodebuild build \
         -scheme DatabaseKit-Package \
         -destination "generic/platform=$platform" \
         -derivedDataPath .build/xcode \
@@ -71,10 +71,10 @@ tools = { tuist = "4.202.1" }
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-tuist generate --no-open
+../Scripts/ci-annotate.sh tuist generate --no-open
 for platform in "iOS Simulator" "macOS" "tvOS Simulator"; do
     echo "▸ Building Bookmarks for $platform"
-    xcodebuild build \
+    ../Scripts/ci-annotate.sh xcodebuild build \
         -workspace Bookmarks.xcworkspace \
         -scheme Bookmarks \
         -destination "generic/platform=$platform" \
@@ -116,7 +116,7 @@ if [[ "${usage_skip_ci:-}" == "false" ]]; then
     skip_ci_opt="--no-skip-ci"
 fi
 
-executor release package $dry_run_opt $enable_changelog_opt $enable_verbose_opt $skip_ci_opt --current-directory .
+Scripts/ci-annotate.sh executor release package $dry_run_opt $enable_changelog_opt $enable_verbose_opt $skip_ci_opt --current-directory .
 '''
 
 [tasks.check_documentation]
@@ -153,7 +153,7 @@ flag "--serve" help="Start a Python HTTP server after building"
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
-executor xcodebuild docc\
+Scripts/ci-annotate.sh executor xcodebuild docc\
     --platform "${usage_platform?}"\
     --hosting-base-path "${usage_hosting_base_path?}"\
     --output-path "public"\

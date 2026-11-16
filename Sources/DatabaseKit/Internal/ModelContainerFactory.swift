@@ -3,15 +3,6 @@ import Foundation
 import SwiftData
 
 enum ModelContainerFactory {
-    /// Core Data's codes for "this file's model version is not one the plan knows".
-    private static let incompatibleStoreCodes: Set<Int> = [
-        NSPersistentStoreIncompatibleVersionHashError,
-        NSMigrationError,
-        NSMigrationMissingSourceModelError,
-        NSMigrationMissingMappingModelError,
-        134_504
-    ]
-
     static func makeContainer(
         for configuration: DatabaseConfiguration,
         cloudKitEnabled: Bool,
@@ -21,7 +12,8 @@ enum ModelContainerFactory {
 
         do {
             return try makeContainer(configuration.schema, modelConfiguration)
-        } catch where configuration.incompatibleStorePolicy == .deleteAndRecreate && isIncompatibleStore(error) {
+        } catch where configuration.incompatibleStorePolicy == .deleteAndRecreate
+            && storeMatchesNoKnownVersion(at: modelConfiguration.url, schema: configuration.schema) {
             logger.log(.error, "Database \(configuration.name): incompatible store deleted and recreated — \(error)")
             removeStore(at: modelConfiguration.url)
 
@@ -93,30 +85,23 @@ enum ModelContainerFactory {
         )
     }
 
-    /// Only a schema mismatch qualifies. A store that is merely unreadable right now — file protection
-    /// while the device is locked, which an extension woken in the background hits — must never be
-    /// deleted.
-    static func isIncompatibleStore(_ error: any Error) -> Bool {
-        underlyingErrors(of: error).contains { error in
-            error.domain == NSCocoaErrorDomain && incompatibleStoreCodes.contains(error.code)
+    /// Whether the file on disk was written by a model version no stage of the plan knows.
+    ///
+    /// Decided from the store's own metadata rather than from the error: `SwiftDataError` hides the
+    /// Core Data cause, and its layout differs between OS releases. A store whose metadata cannot be
+    /// read right now — file protection while the device is locked, which an extension woken in the
+    /// background hits — is never treated as incompatible, so it is never deleted.
+    static func storeMatchesNoKnownVersion(at url: URL, schema: any DatabaseSchema.Type) -> Bool {
+        guard let metadata = try? NSPersistentStoreCoordinator.metadataForPersistentStore(type: .sqlite, at: url) else {
+            return false
         }
-    }
 
-    /// `SwiftDataError` bridges to an `NSError` with an empty `userInfo`, so the Core Data error that
-    /// says *why* the container failed is reachable only through reflection.
-    private static func underlyingErrors(of error: any Error) -> [NSError] {
-        let nsError = error as NSError
-        let wrapped = Mirror(reflecting: error).children.compactMap { child -> (any Error)? in
-            if let error = child.value as? any Error {
-                return error
-            }
-            return Mirror(reflecting: child.value).children.first?.value as? any Error
+        let knownVersions = schema.migrationPlan?.schemas.map { $0.models } ?? [schema.models]
+        // A version whose model cannot be built is assumed to match: unsure means keep the file.
+        return !knownVersions.contains { models in
+            NSManagedObjectModel.makeManagedObjectModel(for: models)?
+                .isConfiguration(withName: nil, compatibleWithStoreMetadata: metadata) ?? true
         }
-        let chained = (nsError.userInfo[NSUnderlyingErrorKey] as? NSError).map { [$0] } ?? []
-
-        return [nsError] + (wrapped + chained)
-            .filter { ($0 as NSError) !== nsError }
-            .flatMap(underlyingErrors(of:))
     }
 
     /// The SQLite file and its write-ahead log: deleting only the first leaves the other two to be
