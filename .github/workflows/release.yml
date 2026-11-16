@@ -1,0 +1,19 @@
+# Semantic release from Conventional Commits: tag + GitHub release + CHANGELOG.md, so consumers can pin
+# `.package(url: …, from: "1.0.0")`. Needs a release bypass on a protected `main` (see ci-shared README).
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  release:
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    uses: amine2233/ci-shared/.github/workflows/semantic-release.yml@1.1.1
+    with:
+      release-args: "--write-change-log"
+    secrets: inherit

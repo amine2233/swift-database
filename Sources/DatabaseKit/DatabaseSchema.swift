@@ -20,6 +20,7 @@ public protocol DatabaseSchema: SendableMetatype {
 }
 
 extension DatabaseSchema {
+    /// No migration plan: the store has only ever shipped one version.
     public static var migrationPlan: (any SchemaMigrationPlan.Type)? { nil }
 
     static var schema: Schema {

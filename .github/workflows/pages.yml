@@ -1,0 +1,22 @@
+# DocC for DatabaseKit and DatabaseKitTesting, published to GitHub Pages.
+# Requires Settings → Pages → Source = "GitHub Actions".
+name: Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  docs:
+    uses: amine2233/ci-shared/.github/workflows/pages.yml@1.1.1
+    with:
+      main-library-name: DatabaseKit
+      hosting-base-path: swift-database
+      platform: macOS
+      macos-runner: macos-26

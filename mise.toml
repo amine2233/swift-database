@@ -1,0 +1,164 @@
+# Task source of truth for CI — see https://github.com/amine2233/ci-shared.
+# The shared workflows only install mise and run `mise run <task>`: keep the task NAMES stable
+# (`test`, `lint`, `release`, `build_documentations`, …) and change the BODIES here.
+
+[tools]
+"github:executor-cli/executor" = "0.28.5"
+
+[env]
+_.file = { path = ".env.local", redact = false }
+
+[tasks.format]
+description = "Format the code using SwiftFormat"
+run = "executor format ."
+
+[tasks.test]
+description = "Run package tests on macOS (SwiftData is Apple-only: there is no Linux run)."
+run = "swift test"
+
+[tasks.test-coverage]
+description = "Run tests with executor-generated coverage report (requires xcrun; macOS only)."
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+executor swift test --enable-code-coverage
+executor test report --report-for-type swift ./
+executor coverage swift --verbose
+'''
+
+[tasks.test-ios]
+description = "Run package tests on the first available iPhone simulator."
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+device_id="$(xcrun simctl list devices available --json | python3 -c '
+import json, sys
+devices = json.load(sys.stdin)["devices"]
+ios = [d for runtime, ds in sorted(devices.items(), reverse=True) if "iOS" in runtime for d in ds if d["name"].startswith("iPhone")]
+print(ios[0]["udid"] if ios else "")
+')"
+if [[ -z "$device_id" ]]; then
+    echo "No available iPhone simulator" >&2
+    exit 1
+fi
+xcodebuild test \
+    -scheme DatabaseKit-Package \
+    -destination "id=$device_id" \
+    -derivedDataPath .build/xcode \
+    -quiet
+'''
+
+[tasks.build-platforms]
+description = "Build the library for every Apple platform it supports."
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+for platform in "iOS Simulator" "tvOS Simulator" "watchOS Simulator" "visionOS Simulator" "macOS"; do
+    echo "▸ Building DatabaseKit for $platform"
+    xcodebuild build \
+        -scheme DatabaseKit-Package \
+        -destination "generic/platform=$platform" \
+        -derivedDataPath .build/xcode \
+        -quiet
+done
+'''
+
+[tasks.build-example]
+description = "Generate the Tuist sample app and build it for iOS, macOS and tvOS (unsigned)."
+dir = "Example"
+# Scoped to this task: a root [tools] entry would also be installed by the Linux release job.
+tools = { tuist = "4.202.1" }
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+tuist generate --no-open
+for platform in "iOS Simulator" "macOS" "tvOS Simulator"; do
+    echo "▸ Building Bookmarks for $platform"
+    xcodebuild build \
+        -workspace Bookmarks.xcworkspace \
+        -scheme Bookmarks \
+        -destination "generic/platform=$platform" \
+        -derivedDataPath ../.build/example \
+        CODE_SIGNING_ALLOWED=NO \
+        -quiet
+done
+'''
+
+[tasks.release]
+description = "Run semantic-release. Use --dry-run to preview without publishing."
+usage = '''
+flag "-d --dry-run" help="Preview the release without publishing (no tag, no commit, no GitHub Release)"
+flag "--write-change-log" help="Enable writing a changelog"
+flag "--skip-ci/--no-skip-ci" help="Skip CI (default: --skip-ci)" default="true"
+flag "--verbose" help="Enable verbose mode"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+
+dry_run_opt=""
+if [[ "${usage_dry_run:-}" == "true" ]]; then
+    dry_run_opt="--dry-run"
+fi
+
+enable_changelog_opt=""
+if [[ "${usage_write_change_log:-}" == "true" ]]; then
+    enable_changelog_opt="--write-change-log"
+fi
+
+enable_verbose_opt=""
+if [[ "${usage_verbose:-}" == "true" ]]; then
+    enable_verbose_opt="--verbose"
+fi
+
+skip_ci_opt="--skip-ci"
+if [[ "${usage_skip_ci:-}" == "false" ]]; then
+    skip_ci_opt="--no-skip-ci"
+fi
+
+executor release package $dry_run_opt $enable_changelog_opt $enable_verbose_opt $skip_ci_opt --current-directory .
+'''
+
+[tasks.check_documentation]
+description = "Lint code documentation"
+run = "executor linting documentation ./Sources --reporter console"
+
+[tasks.check_code]
+description = "Lint source code"
+run = "executor linting code ./Sources --reporter console"
+
+[tasks.check_commit_title]
+description = "Lint the latest commit title against the project's convention."
+run = "executor check-ci commit-title"
+
+# Used by CI's title-check job; GITHUB_TOKEN / COMMENT_TARGET come from the workflow.
+[tasks.check_merge_request_title]
+description = "Lint the pull request title and post the result as a PR comment."
+run = 'executor merge-request-title --post-comment --comment-token "${GITHUB_TOKEN?}" --comment-target "${COMMENT_TARGET?}"'
+
+[tasks.lint]
+description = "Run all static checks (code + documentation)."
+depends = ["check_code", "check_documentation"]
+
+[tasks.build_documentations]
+description = "Build the documentation using docc"
+usage = '''
+arg <platform> help="The default platform" default="macOS" {
+    choices "iOS" "macOS"
+}
+flag "--hosting-base-path <hosting-base-path>" help="Hosting base path" default="" env="HOSTING_BASE_PATH"
+flag "--main-library-name <main-library-name>" help="The main package library" default="DatabaseKit" env="MAIN_LIBRARY_NAME"
+flag "--serve" help="Start a Python HTTP server after building"
+'''
+run = '''
+#!/usr/bin/env bash
+set -euo pipefail
+executor xcodebuild docc\
+    --platform "${usage_platform?}"\
+    --hosting-base-path "${usage_hosting_base_path?}"\
+    --output-path "public"\
+    --verbose
+if [[ "${usage_serve:-}" == "true" ]]; then
+    python3 -m http.server -d public
+fi
+'''

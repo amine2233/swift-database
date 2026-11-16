@@ -18,10 +18,12 @@ public protocol Repository<Model>: Sendable {
 }
 
 extension Repository {
+    /// Inserts `model`, or updates the row already carrying its id.
     public func upsert(_ model: Model) async throws {
         try await upsert([model])
     }
 
+    /// Deletes the row carrying `id`; does nothing if there is none.
     public func delete(id: Model.ID) async throws {
         try await delete(ids: [id])
     }

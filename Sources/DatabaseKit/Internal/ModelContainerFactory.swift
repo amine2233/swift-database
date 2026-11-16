@@ -9,7 +9,7 @@ enum ModelContainerFactory {
         NSMigrationError,
         NSMigrationMissingSourceModelError,
         NSMigrationMissingMappingModelError,
-        134_504,
+        134_504
     ]
 
     static func makeContainer(

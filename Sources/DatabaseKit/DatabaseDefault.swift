@@ -34,9 +34,10 @@ public final actor DatabaseDefault: Database {
         self.isEphemeral = configuration.location == .inMemory
         self.isCloudKitEnabled = cloudKitEnabled
         self.logger = logger
+        let path = container.configurations.first?.url.path ?? "memory"
         logger.log(
             .info,
-            "Database \(configuration.name) opened at \(container.configurations.first?.url.path ?? "memory"), CloudKit mirroring \(cloudKitEnabled ? "on" : "off")"
+            "Database \(configuration.name) opened at \(path), CloudKit mirroring \(cloudKitEnabled ? "on" : "off")"
         )
     }
 
@@ -78,7 +79,10 @@ public final actor DatabaseDefault: Database {
     ///   scheduled. Turning sync off stops new exports, not the ones in flight.
     public func setCloudKitEnabled(_ enabled: Bool) async throws {
         guard configuration.canMirror, !isEphemeral, !ProcessEnvironment.isRunningTests else {
-            logger.log(.debug, "Database \(configuration.name): ignoring setCloudKitEnabled(\(enabled)) — this store never mirrors")
+            logger.log(
+                .debug,
+                "Database \(configuration.name): ignoring setCloudKitEnabled(\(enabled)) — this store never mirrors"
+            )
             return
         }
         guard enabled != isCloudKitEnabled else { return }

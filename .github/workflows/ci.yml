@@ -1,0 +1,48 @@
+# Shared CI from amine2233/ci-shared: the logic lives in mise.toml, this file only wires the jobs.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Lint + PR title check (pull requests only) and `mise run test` on macOS.
+  ci:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: amine2233/ci-shared/.github/workflows/ci.yml@1.1.1
+    with:
+      # Swift 6.2 (Xcode 26) is the package minimum; older images ship Swift 6.1.
+      macos-runner: macos-26
+      # SwiftData only exists on Apple platforms.
+      enable-linux: false
+      enable-lint: true
+      enable-coverage: false
+      enable-title-check: true
+
+  # What the shared workflow cannot express: every Apple platform, and the sample app with its extensions.
+  apple-platforms:
+    name: ${{ matrix.name }}
+    runs-on: macos-26
+    # Its own group: sharing the reusable workflow's `ci-<workflow>-<ref>` group would make the jobs cancel each other.
+    concurrency:
+      group: apple-${{ matrix.task }}-${{ github.ref }}
+      cancel-in-progress: true
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Test (iOS Simulator)
+            task: test-ios
+          - name: Build (iOS, tvOS, watchOS, visionOS, macOS)
+            task: build-platforms
+          - name: Build sample app (iOS, macOS, tvOS)
+            task: build-example
+    steps:
+      - uses: actions/checkout@v4
+      - uses: amine2233/ci-shared/actions/mise-run@1.1.1
+        with:
+          tasks: ${{ matrix.task }}

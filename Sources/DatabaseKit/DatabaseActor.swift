@@ -98,7 +98,10 @@ public final actor DatabaseActor: SwiftData.ModelActor {
         }
         logger.log(
             .info,
-            "Database write: batch applied to \(Entity.self) — \(changes.upserts.count) upserted, \(changes.deletions.count) deleted"
+            """
+            Database write: batch applied to \(Entity.self) — \(changes.upserts.count) upserted, \
+            \(changes.deletions.count) deleted
+            """
         )
     }
 

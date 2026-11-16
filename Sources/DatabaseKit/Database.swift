@@ -24,6 +24,7 @@ public protocol Database: Sendable {
 }
 
 extension Database {
+    /// A repository over `Entity`, bound to this store rather than to its current actor.
     public func repository<Entity: DatabaseEntity>(for _: Entity.Type) -> RepositoryDefault<Entity> {
         RepositoryDefault(database: self)
     }

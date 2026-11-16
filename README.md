@@ -210,9 +210,11 @@ For integration tests against real SwiftData, use `location: .inMemory`, or `.ur
 directory when the test needs persistence or migration.
 
 ```bash
-swift test                                                   # macOS
-xcodebuild test -scheme DatabaseKit-Package \
-  -destination 'platform=iOS Simulator,name=iPhone 18 Pro'   # iOS
+mise run test              # swift test (macOS)
+mise run test-ios          # package tests on the first available iPhone simulator
+mise run build-platforms   # iOS, tvOS, watchOS, visionOS, macOS
+mise run build-example     # Tuist sample app for iOS, macOS, tvOS (unsigned)
+mise run lint              # executor code + documentation lint
 ```
 
 ---
@@ -231,7 +233,7 @@ A Bookmarks app showing one shared `.group` store used from four kinds of proces
 
 ```bash
 cd Example
-mise install          # pins Tuist (mise.toml)
+mise install          # pins Tuist (Example/mise.toml)
 tuist generate        # opens Bookmarks.xcworkspace
 ```
 
@@ -239,6 +241,27 @@ Before running on a device, set your team and replace `com.example.databasekit.b
 `group.com.example.databasekit.bookmarks` in `Project.swift` and `BookmarksDatabase.swift` with
 identifiers you own. To try the Safari extension, enable it in Safari › Settings › Extensions (macOS)
 or Settings › Apps › Safari › Extensions (iOS).
+
+---
+
+## 6. CI
+
+CI uses [`amine2233/ci-shared`](https://github.com/amine2233/ci-shared). The workflows only run
+`mise run <task>`, and every task is defined in [`mise.toml`](mise.toml). Run the same commands
+locally to reproduce a CI failure.
+
+| Workflow | Trigger | Runs |
+|---|---|---|
+| `ci.yml` (shared) | push / PR to `main` | `lint` and the PR title check (PRs only), `test` on macOS |
+| `ci.yml` (`apple-platforms`) | push / PR to `main` | `test-ios`, `build-platforms`, `build-example` |
+| `release.yml` | push to `main` | `release`: semantic-release tag, GitHub release, `CHANGELOG.md` |
+| `pages.yml` | push to `main` | `build_documentations` → DocC on GitHub Pages |
+
+- There is no Linux job because SwiftData is Apple-only. macOS jobs pin `macos-26` because the
+  package needs Swift 6.2 / Xcode 26.
+- PR titles must follow Conventional Commits (`feat:`, `fix:`, …), because they drive the release version.
+- One-time repo setup: **Settings → Pages → Source = GitHub Actions**. If `main` is protected, give
+  the release a bypass (see the ci-shared README, "let the release push to a protected `main`").
 
 ---
 

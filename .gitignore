@@ -11,3 +11,9 @@ DerivedData/
 Example/*.xcodeproj
 Example/*.xcworkspace
 Example/Derived/
+
+# mise / CI
+.env.local
+/public
+*.doccarchive
+app*.log
