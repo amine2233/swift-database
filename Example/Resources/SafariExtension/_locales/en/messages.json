@@ -1,0 +1,4 @@
+{
+  "extension_name": { "message": "Bookmarks" },
+  "extension_description": { "message": "Save the current page to the Bookmarks app's shared DatabaseKit store." }
+}
