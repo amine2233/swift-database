@@ -143,20 +143,22 @@ depends = ["check_code", "check_documentation"]
 [tasks.build_documentations]
 description = "Build the documentation using docc"
 usage = '''
-arg <platform> help="The default platform" default="macOS" {
+arg <platform> help="The default platform" default="iOS" {
     choices "iOS" "macOS"
 }
 flag "--hosting-base-path <hosting-base-path>" help="Hosting base path" default="" env="HOSTING_BASE_PATH"
-flag "--main-library-name <main-library-name>" help="The main package library" default="DatabaseKit" env="MAIN_LIBRARY_NAME"
+flag "--main-library-name <main-library-name>" help="The main package library" default="DatabaseKit-Package" env="MAIN_LIBRARY_NAME"
 flag "--serve" help="Start a Python HTTP server after building"
 '''
 run = '''
 #!/usr/bin/env bash
 set -euo pipefail
 Scripts/ci-annotate.sh executor xcodebuild docc\
+    --enable-clining\
     --platform "${usage_platform?}"\
     --hosting-base-path "${usage_hosting_base_path?}"\
     --output-path "public"\
+    --derived-data ".build"\
     --verbose
 if [[ "${usage_serve:-}" == "true" ]]; then
     python3 -m http.server -d public
